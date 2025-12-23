@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -433,27 +434,28 @@ export const MagicParticles: React.FC<MagicParticlesProps> = ({
         loader.load(FONT_URL, (font) => {
             const fontSize = 2;
             const lineHeight = 2.5; 
-            const maxChars = 15; // Maksimum karakter sınırı (Satır başına)
+            const maxChars = 15; 
             
-            // Metni satırlara böl
             const lines = wrapText(text, maxChars);
             
-            // Her satır için geometri oluştur ve birleştir
             const geometries: THREE.ExtrudeGeometry[] = [];
             
             lines.forEach((line, i) => {
                 const shapes = font.generateShapes(line, fontSize);
                 if (shapes.length > 0) {
+                    // *** 3D METİN GÜNCELLEMESİ ***
+                    // Depth: 1 (Makul bir 3D kalınlık)
+                    // Bevel: İnce ayarlandı (Overlap önlemek için)
                     const geom = new THREE.ExtrudeGeometry(shapes, { 
-                        depth: 0, 
-                        bevelEnabled: false 
+                        depth: 1, 
+                        bevelEnabled: true,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.05,
+                        bevelSegments: 2
                     });
                     
                     geom.computeBoundingBox();
-                    // Satırı ortala
                     const xMid = -0.5 * (geom.boundingBox!.max.x - geom.boundingBox!.min.x);
-                    // Dikey konumlandırma (Yukarıdan aşağı)
-                    // Tüm bloğu dikeyde ortalamak için offset hesapla
                     const totalBlockHeight = lines.length * lineHeight;
                     const yStart = (totalBlockHeight / 2) - lineHeight / 2;
                     const yPos = yStart - (i * lineHeight);
@@ -469,8 +471,6 @@ export const MagicParticles: React.FC<MagicParticlesProps> = ({
                  return;
             }
 
-            // Geometrileri Birleştirme (Manual Merge to avoid external dependencies)
-            // Sadece position attribute'una ihtiyacımız var
             let totalVertices = 0;
             geometries.forEach(g => totalVertices += g.attributes.position.count);
             
@@ -481,21 +481,17 @@ export const MagicParticles: React.FC<MagicParticlesProps> = ({
                 const arr = g.attributes.position.array;
                 mergedPositions.set(arr, offset);
                 offset += arr.length;
-                g.dispose(); // Temizlik
+                g.dispose(); 
             });
             
-            // Alan hesaplaması için geçici buffer geometry
             const mergedGeometry = new THREE.BufferGeometry();
             mergedGeometry.setAttribute('position', new THREE.BufferAttribute(mergedPositions, 3));
             
             mergedGeometry.computeBoundingBox();
             const bbox = mergedGeometry.boundingBox!;
             const maxDim = Math.max(bbox.max.x - bbox.min.x, bbox.max.y - bbox.min.y);
-            // Normalizasyon: Metin ne kadar uzun olursa olsun kutuya sığdır, ama satır bölme sayesinde
-            // kutu artık kareye yakın olduğu için harfler büyür.
             const normalizeScale = 1 / (maxDim || 1);
             
-            // Alan Hesaplama ve Nokta Dağıtımı
             const posAttribute = mergedGeometry.attributes.position;
             const triangleCount = posAttribute.count / 3;
             
@@ -538,11 +534,8 @@ export const MagicParticles: React.FC<MagicParticlesProps> = ({
                 let r1 = Math.random(), r2 = Math.random();
                 if (r1 + r2 > 1) { r1 = 1 - r1; r2 = 1 - r2; }
                 
-                // Noktayı üçgen üzerinde oluştur
                 tempTarget.copy(a).addScaledVector(b.clone().sub(a), r1).addScaledVector(c.clone().sub(a), r2);
                 
-                // Merkeze hizalama ve Scale
-                // Normalizasyonu burada uyguluyoruz
                 tempTarget.multiplyScalar(normalizeScale);
 
                 normTargets[i * 3] = tempTarget.x;
